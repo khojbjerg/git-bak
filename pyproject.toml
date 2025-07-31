@@ -1,0 +1,17 @@
+[project]
+name = "git-bak"
+version = "0.1.0"
+description = "Git-Bak is a backup/restore cli for local Git repositories."
+readme = "README.md"
+authors = [
+    { name = "khojbjerg", email = "35362361+khojbjerg@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+git-bak = "git_bak.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
