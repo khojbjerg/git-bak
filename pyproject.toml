@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Git-Bak is a backup/restore cli for local Git repositories."
 readme = "README.md"
 authors = [
-    { name = "khojbjerg", email = "35362361+khojbjerg@users.noreply.github.com" }
+    { name = "Kasper Hojbjerg" }
 ]
 requires-python = ">=3.12"
 dependencies = []
