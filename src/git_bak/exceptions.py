@@ -10,13 +10,21 @@ class RestoreError(GitBakException):
     pass
 
 
-class CommandError(GitBakException):
+class GitError(GitBakException):
     pass
 
 
-class GitRepoInvalid(GitBakException):
+class GitRepoInvalid(GitError):
     pass
 
 
-class GitRepoHasNoCommits(GitBakException):
+class GitRepoHasNoCommits(GitError):
+    pass
+
+
+class GitBundleError(GitError):
+    pass
+
+
+class RunnerError(GitBakException):
     pass

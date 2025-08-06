@@ -1,56 +1,58 @@
 from abc import ABC, abstractmethod
-from pathlib import Path
 
-from git_bak import git
-from git_bak.command import BackupCommand, Command, RestoreCommand
-from git_bak.exceptions import BackupError, RestoreError
+from git_bak.exceptions import (
+    GitBundleError,
+    GitRepoHasNoCommits,
+    GitRepoInvalid,
+    RestoreError,
+)
+from git_bak.git import Git
 from git_bak.logging import logger
+from git_bak.requests import BackupRequest, Request, RestoreRequest
 
 
-class Handler[T: Command](ABC):
+class Handler[T: Request](ABC):
     """Handler abstraction"""
 
     @abstractmethod
-    def handle(self, command: T) -> None:
+    def handle(self, request: T) -> None:
         raise NotImplementedError
 
 
-class BackupHandler(Handler[BackupCommand]):
-    def handle(self, command: BackupCommand) -> None:
+class BackupHandler(Handler[BackupRequest]):
+    def __init__(self, git: Git):
+        self._git = git
+
+    def handle(self, request: BackupRequest) -> None:
         """Creates a Git bundle from a source project and stores at a desired location."""
-        logger.info(f"Backup Git repository : {command.source.name}")
+        logger.info(f"Starting backup for: {request.source}")
         try:
-            git.backup(command.source, command.destination)
-        except BackupError as e:
-            logger.error(e)
+            result = self._git.create_bundle(request.source, request.destination)
+            logger.info(f"Backup completed for: {request.source} -> {result}")
+        except GitRepoInvalid as e:
+            logger.warning(f"{request.source} Skipping: {e}")
+        except GitRepoHasNoCommits as e:
+            logger.warning(f"{request.source} Skipping: {e}")
+        except GitBundleError as e:
+            logger.error(f"{request.source} {e}")
 
 
-class RestoreHandler(Handler[RestoreCommand]):
-    def handle(self, command: RestoreCommand) -> None:
-        logger.info(f"Restore Git repository : {command.source.name}")
+class RestoreHandler(Handler[RestoreRequest]):
+    def __init__(self, git: Git):
+        self._git = git
+
+    def handle(self, request: RestoreRequest) -> None:
+        logger.info(f"Starting restore for: {request.source}")
         try:
-            bundle_path = self._find_bundle(command.source, command.timestamp)
-            git.restore(bundle_path, command.destination)
+            result = self._git.clone_bundle(request.source, request.destination)
+            logger.info(f"Restore completed for: {request.source} -> {result}")
         except RestoreError as e:
-            logger.error(e)
-
-    @staticmethod
-    def _find_bundle(path: Path, timestamp: str | None) -> Path:
-        try:
-            if timestamp is None:
-                return max(path.iterdir(), key=lambda f: f.stat().st_mtime)
-            return next((f for f in path.iterdir() if timestamp in str(f)))
-        except ValueError:
-            raise RestoreError(f"No Git bundle found : {path}")
-        except StopIteration:
-            raise RestoreError(
-                f"No Git bundle found for timestamp {timestamp} : {path}"
-            )
+            logger.warning(f"{request.source} {e}")
 
 
-def factory(command: str) -> Handler:
+def factory(command: str, git: Git) -> Handler:
     """Handler factory that returns a concrete Handler based on the command argument."""
     if command == "backup":
-        return BackupHandler()
+        return BackupHandler(git)
     if command == "restore":
-        return RestoreHandler()
+        return RestoreHandler(git)

@@ -1,9 +1,10 @@
 from pathlib import Path
 
-from git_bak import command, handlers
+from git_bak import handlers, requests
 from git_bak.args import parser
-from git_bak.exceptions import BackupError, RestoreError
+from git_bak.git import Git
 from git_bak.logging import logger, setup_logging
+from git_bak.runners import SubprocessRunner
 
 HOME = Path.home()
 LOG_FILE = "git_{}.log"
@@ -13,18 +14,27 @@ def main():
     try:
         args = parser()
         setup_logging(
-            HOME / LOG_FILE.format(args.command), args.log_level, args.verbose
+            HOME / LOG_FILE.format(args.command),
+            args.log_to_file,
+            args.verbose,
+            args.quiet,
         )
-        logger.info(f"{args.command.capitalize()} Operation started")
-        commands = command.factory(args.command, args)
-        handler = handlers.factory(args.command)
-        for cmd in commands:
-            handler.handle(cmd)
-        logger.info(f"{args.command.capitalize()} Operation successfully completed")
-    except BackupError as e:
-        logger.error(e)
-    except RestoreError as e:
-        logger.error(e)
+        runner = SubprocessRunner()
+        git = Git(runner)
+        logger.info(f"Source directory : {args.source}")
+        logger.info(f"Destination directory : {args.destination}")
+        logger.debug(f"Include filter: {args.include}")
+        logger.debug(f"Exclude fitler: {args.exclude}")
+        logger.debug(f"Timestamp fitler: {args.timestamp}") if args.timestamp else None
+        reqs = requests.factory(args.command, args)
+        if not reqs:
+            logger.warning(
+                "No Git Requests generated for Git Handlers to process. Check source directory."
+            )
+        handler = handlers.factory(args.command, git)
+        for request in reqs:
+            logger.debug(request)
+            handler.handle(request)
     except Exception as e:
         logger.exception(e)
 

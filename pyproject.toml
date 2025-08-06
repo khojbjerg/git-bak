@@ -1,6 +1,6 @@
 [project]
 name = "git-bak"
-version = "0.1.0"
+version = "0.2.0"
 description = "Git-Bak is a backup/restore cli for local Git repositories."
 readme = "README.md"
 authors = [
@@ -15,3 +15,16 @@ git-bak = "git_bak.main:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = "src"
+
+
+[project.urls]
+Homepage = "https://github.com/khojbjerg/git-bak"

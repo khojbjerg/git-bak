@@ -1,55 +1,74 @@
 import argparse
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 
 @dataclass
-class Arguments:
+class CliArguments:
     command: str
     source: Path
     destination: Path
-    include: list[str]
-    exclude: list[str]
-    log_level: str
+    include: list[str] | None
+    exclude: list[str] | None
     verbose: bool
+    log_to_file: bool
+    quiet: bool
     timestamp: str | None = None
 
 
-def parser() -> Arguments:
+def validate_timestamp(value: str) -> str:
+    pattern = r"^\d{8}_\d{6}$"  # YYYYMMDD_HHMMSS
+    if not re.match(pattern, value):
+        raise argparse.ArgumentTypeError(
+            f"Invalid timestamp format: '{value}'. Expected format: YYYYMMDD_HHMMSS"
+        )
+    return value
+
+
+def parser(argv: list[str] | None = None) -> CliArguments:
     """Parse argparse arguments and returns a custom Arguments dataclass object."""
     common_parser = argparse.ArgumentParser(add_help=False)
     common_parser.add_argument(
         "--source",
         type=Path,
         required=True,
-        help=f"Path to directory containing Git projects",
+        help="Path to the source directory (where the repos are located or backed up).",
     )
     common_parser.add_argument(
         "--destination",
         type=Path,
         required=True,
-        help=f"Directory to store bundle files",
-    )
-    common_parser.add_argument(
-        "--log-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help=f"Set the logging level.",
+        help="Path to the destination directory (where to store or restore repositories).",
     )
     common_parser.add_argument(
         "--include",
         nargs="+",
-        help="Optional list of project folder names to include. Seperate project names by space (defaults to None, which is all projects in projects-dir)",
+        help="Optional List of repository names to include. Seperate names by space.",
     )
     common_parser.add_argument(
         "--exclude",
         nargs="+",
-        help="Optional list of project folder names to exclude. Seperate project names by space (defaults to None which excludes no projects in projects-dir)",
+        help="Optional List of repository names to exclude. Seperate names by space.",
     )
-    common_parser.add_argument("--verbose", action="store_true")
+    common_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Optional Enable debug logging.",
+    )
+    common_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Optional Suppress console output (StreamHandler) (useful for cron).",
+    )
+    common_parser.add_argument(
+        "--log-to-file",
+        action="store_true",
+        help=f"Optional Enable file logging. Log file location: {Path.home() / 'git_backup|restore.log'}",
+    )
 
     parser = argparse.ArgumentParser(
-        description=f"Backup/Restore Git repositories. Log files stored in {Path.home() / 'git_backup|restore.log'}",
+        description="Backup/Restore Git repositories.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -62,11 +81,14 @@ def parser() -> Arguments:
     )
     restore_parser.add_argument(
         "--timestamp",
-        type=str,
-        help="Optional timestamp str value of specific backup to restore. e.g 20250731_1000 (defaults to None which will take the latest backup)",
+        type=validate_timestamp,
+        help="Restore from a specific backup timestamp (e.g 20250731_1000). If not provided, restores the latest backup.",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+
+    if args.source == args.destination:
+        parser.error("Source and destination can't be the same directory.")
 
     if args.include and args.exclude:
         parser.error("You cannot use both --include and --exclude at the same time.")
@@ -87,13 +109,15 @@ def parser() -> Arguments:
             parser.error(
                 f"Included project(s) not found in {source}: {', '.join(missing)}"
             )
-    return Arguments(
+
+    return CliArguments(
         args.command,
         args.source,
         args.destination,
         args.include,
         args.exclude,
-        args.log_level,
         args.verbose,
+        args.log_to_file,
+        args.quiet,
         args.timestamp if hasattr(args, "timestamp") else None,
     )
